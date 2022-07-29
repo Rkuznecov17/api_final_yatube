@@ -1,8 +1,7 @@
+from django.contrib.auth.hashers import make_password
+from posts.models import Comment, Follow, Group, Post, User
 from rest_framework import serializers
 from rest_framework.relations import SlugRelatedField
-
-
-from posts.models import Comment, Group, Follow, Post, User
 
 
 class PostSerializer(serializers.ModelSerializer):
@@ -35,8 +34,9 @@ class GroupSerializer(serializers.ModelSerializer):
 
 class FollowSerializer(serializers.ModelSerializer):
     user = serializers.SlugRelatedField(
-        read_only=True,
-        slug_field='username'
+        slug_field='username',
+        queryset=User.objects.all(),
+        default=serializers.CurrentUserDefault()
     )
     following = serializers.SlugRelatedField(
         queryset=User.objects.all(),
@@ -44,19 +44,45 @@ class FollowSerializer(serializers.ModelSerializer):
     )
 
     def validate(self, data):
-        user = self.context['request'].user
-        following = data['following']
-        is_unique = Follow.objects.filter(user=user, following=following)
-        if user == following:
+        if data['user'] == data['following']:
             raise serializers.ValidationError(
                 'Вы не можете быть подписаны на себя.'
-            )
-        if len(is_unique) != 0:
-            raise serializers.ValidationError(
-                'Вы уже подписаны на автора.'
             )
         return data
 
     class Meta:
         fields = ('user', 'following')
         model = Follow
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=Follow.objects.all(),
+                fields=('user', 'following'),
+                message='Вы уже подписаны на автора.'
+            )
+        ]
+
+
+class UserCreateSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = User
+        fields = (
+            'id',
+            'username',
+            'password'
+        )
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create(
+            username=validated_data['username'],
+            password=make_password(validated_data['password'])
+        )
+        return user
+
+    def validate(self, data):
+        if data['username'] == 'me':
+            raise serializers.ValidationError(
+                '"Me" - запрещенное имя при создании пользователя.'
+            )
+        return data
