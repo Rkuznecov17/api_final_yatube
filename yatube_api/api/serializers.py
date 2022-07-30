@@ -48,7 +48,7 @@ class FollowSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'Вы не можете быть подписаны на себя.'
             )
-        return data
+        return super().validate(data) 
 
     class Meta:
         fields = ('user', 'following')
@@ -85,4 +85,4 @@ class UserCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 '"Me" - запрещенное имя при создании пользователя.'
             )
-        return data
+        return super().validate(data) 
